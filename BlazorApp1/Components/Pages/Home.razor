@@ -1,0 +1,92 @@
+﻿@page "/"
+@using System.Dynamic;
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Data
+@using Syncfusion.Blazor.DropDowns
+
+<SfGrid DataSource="@Orders" AllowGrouping="true" AllowFiltering="true" AllowSorting="true" Toolbar="@(new List<string>() { "Add", "Edit", "Delete", "Update", "Cancel" })">
+    <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true" Mode="EditMode.Normal"></GridEditSettings>
+    <GridEvents RowUpdating="RowUpdating" TValue="OrdersDetails"></GridEvents>
+    <GridColumns>
+    <GridColumn IsPrimaryKey="true" Field="OrderID" HeaderText="Order ID" TextAlign="TextAlign.Right" Width="120" />
+    <GridColumn Field="CustomerID" HeaderText="Customer Name" Width="150" />
+    <GridColumn Field="OrderDate" HeaderText="Order Date" EditType="EditType.DatePickerEdit" TextAlign="TextAlign.Right" Format="d" Type="ColumnType.Date" Width="130" />
+    <GridColumn Field="Freight" HeaderText="Freight" Format="C2" TextAlign="TextAlign.Right" Width="120" />
+    <GridColumn Field="Account" HeaderText="Account" EditType="EditType.DropDownEdit" TextAlign="TextAlign.Right" Width="120">
+        <EditTemplate>
+                @{
+                    var ord = context as OrdersDetails;
+                    ComboBoxValue = (string)DataUtil.GetDynamicValue(ord as DynamicObject, "Account");
+                    <SfComboBox ID="Account" Placeholder="Select an Account" Value="@ComboBoxValue" TItem="string" TValue="string" DataSource="@accounts">
+                        <ComboBoxEvents TValue="string" TItem="string" ValueChange="ValueChangeHandler"></ComboBoxEvents>
+                    </SfComboBox>
+                }
+        </EditTemplate>
+    </GridColumn>
+    </GridColumns>
+</SfGrid>
+
+@code{
+    public List<OrdersDetails> Orders { get; set; } = new List<OrdersDetails>();
+    public List<string> accounts { get; set; } = (new List<string> { "John", "Jane", "Joe", "Jack", "Smith", "Elena" });
+    public string ComboBoxValue { get; set; }
+
+    public void ValueChangeHandler(Syncfusion.Blazor.DropDowns.ChangeEventArgs<string, string> args) {
+        ComboBoxValue = args.Value;
+    }
+
+    protected override void OnInitialized()
+    {
+        Orders = Enumerable.Range(1, 12).Select((x) =>
+        {
+            dynamic dynamicObj = new OrdersDetails();
+            dynamicObj.OrderID = 1000 + x;
+            dynamicObj.CustomerID = (new string[] { "ALFKI", "ANANTR", "ANTON", "BLONP", "BOLID" })
+            [new Random().Next(5)];
+            dynamicObj.Freight = 2.1 * x;
+            dynamicObj.Account = "";
+            dynamicObj.OrderDate = DateTime.Now.AddDays(-x);
+            return dynamicObj;
+        }).Cast<OrdersDetails>().ToList<OrdersDetails>();
+    }
+
+    public async void RowUpdating(RowUpdatingEventArgs<OrdersDetails> Args)
+    {
+        ((OrdersDetails)Args.Data).TrySetMember(new DataSetMemberBinderClone("Account", false), ComboBoxValue);
+        await Task.CompletedTask;
+    }
+
+    public class OrdersDetails : DynamicObject
+    {
+        Dictionary<string, object> OrdersDictionary = new Dictionary<string, object>();
+
+        public override bool TryGetMember(GetMemberBinder binder, out object result)
+        {
+            string name = binder.Name;
+            return OrdersDictionary.TryGetValue(name, out result);
+        }
+
+        public override bool TrySetMember(SetMemberBinder binder, object value)
+        {
+            OrdersDictionary[binder.Name] = value;
+            return true;
+        }
+
+        public override IEnumerable<string> GetDynamicMemberNames()
+        {
+            return this.OrdersDictionary?.Keys;
+        }
+    }
+    public class DataSetMemberBinderClone : SetMemberBinder
+    {
+        public DataSetMemberBinderClone(string name, bool ignoreCase)
+            : base(name, ignoreCase)
+        {
+        }
+
+        public override DynamicMetaObject FallbackSetMember(DynamicMetaObject target, DynamicMetaObject value, DynamicMetaObject errorSuggestion)
+        {
+            throw new NotImplementedException();
+        }
+    }
+}
